@@ -66,7 +66,8 @@ export class FolderService implements vscode.DocumentFormattingEditProvider {
     const isInstalled = await dprintExe.checkInstalled();
     this.#assertNotDisposed();
     if (!isInstalled) {
-      this.#logErrorAndMaybeFocus(
+      this.#logErrorAndMaybeNotify(
+        "Failed initializing dprint.",
         `Error initializing dprint. Ensure it is globally installed on the path (see https://dprint.dev/install) `
           + `or specify a "dprint.path" setting to the executable.`,
       );
@@ -99,7 +100,11 @@ export class FolderService implements vscode.DocumentFormattingEditProvider {
         throw err;
       }
 
-      this.#logErrorAndMaybeFocus(`Error initializing in ${dprintExe.initializationFolderUri.fsPath}:`, err);
+      this.#logErrorAndMaybeNotify(
+        "Failed initializing dprint.",
+        `Error initializing in ${dprintExe.initializationFolderUri.fsPath}:`,
+        err,
+      );
       return false;
     }
   }
@@ -168,12 +173,12 @@ export class FolderService implements vscode.DocumentFormattingEditProvider {
     return getDprintConfig(this.uri);
   }
 
-  #logErrorAndMaybeFocus(message: string, ...args: any[]) {
+  #logErrorAndMaybeNotify(notificationMessage: string, message: string, ...args: any[]) {
     if (this.#configUri == null) {
-      // only log... don't annoy people with focusing in this case
+      // only log... don't annoy people with notifications in this case
       this.#logger.logError(message, ...args);
     } else {
-      this.#logger.logErrorAndFocus(message, ...args);
+      this.#logger.logErrorAndNotify(notificationMessage, message, ...args);
     }
   }
 }
