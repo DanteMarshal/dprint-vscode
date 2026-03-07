@@ -201,8 +201,9 @@ export class EditorService5 implements EditorService {
   }
 
   private startProcessIfNotRunning() {
-    if (this._disposed || this._disposing)
+    if (this._disposed || this._disposing) {
       return;
+    }
 
     this._process.startProcessIfNotRunning();
   }
