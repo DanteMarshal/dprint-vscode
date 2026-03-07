@@ -61,7 +61,7 @@ export class Logger {
     // only notify max one time per session to not annoy people
     if (!Logger.#hasFocused) {
       Logger.#hasFocused = true;
-      const buttonText = "Go to Output";
+      const buttonText = "Go to output";
       vscode.window.showWarningMessage(notificationMessage, buttonText).then(selection => {
         if (selection === buttonText) {
           this.#outputChannel.show();
