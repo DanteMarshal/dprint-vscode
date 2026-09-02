@@ -11,7 +11,7 @@
     "url": "https://github.com/dprint/dprint-vscode.git"
   },
   "engines": {
-    "vscode": "^1.45.0"
+    "vscode": "^1.82.0"
   },
   "categories": [
     "Formatters"
@@ -85,16 +85,15 @@
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
-    "@types/glob": "^7.1.4",
-    "@types/mocha": "^9.0.0",
-    "@types/node": "^20.14.11",
-    "@types/vscode": "^1.45.0",
-    "@vscode/test-electron": "^2.1.5",
-    "@vscode/vsce": "^3.3.2",
-    "esbuild": "^0.14.29",
-    "glob": "^7.2.0",
-    "mocha": "^9.2.2",
-    "typescript": "^4.6.3"
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.19.43",
+    "@types/vscode": "^1.82.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.2",
+    "glob": "^13.0.6",
+    "mocha": "^10.8.2",
+    "typescript": "^5.9.3"
   },
   "__metadata": {
     "id": "a71f21fc-951b-4829-92f5-ba423b77109f",

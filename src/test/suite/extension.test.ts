@@ -44,9 +44,13 @@ suite("Extension Test Suite", () => {
       );
     },
     async openWorkspace() {
-      await vscode.commands.executeCommand("vscode.openFolder", this.tempFolderUri);
-      await vscode.workspace.getConfiguration("files").update("eol", "\n");
-      await vscode.workspace.getConfiguration("editor").update("defaultFormatter", "dprint.dprint");
+      await vscode.commands.executeCommand("dprint.restart");
+      await vscode.workspace.getConfiguration("files").update("eol", "\n", vscode.ConfigurationTarget.Workspace);
+      await vscode.workspace.getConfiguration("editor").update(
+        "defaultFormatter",
+        "dprint.dprint",
+        vscode.ConfigurationTarget.Workspace,
+      );
     },
     async configureFormatOnSave() {
       await vscode.workspace.getConfiguration("editor").update("formatOnSave", true);
