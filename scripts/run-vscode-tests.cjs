@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, "..");
 const fixtureTemplate = path.join(root, "src", "test", "fixtures", "lsp-workspace");
 const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dprint-vscode-test-"));
 const workspace = path.join(testRoot, "workspace");
+const userDataDir = path.join(testRoot, "u");
 let cleaned = false;
 
 function cleanup() {
@@ -49,6 +50,7 @@ try {
       env: {
         ...process.env,
         DPRINT_TEST_WORKSPACE: workspace,
+        DPRINT_TEST_USER_DATA_DIR: userDataDir,
         ...(vsixPath == null ? {} : { DPRINT_TEST_VSIX: path.resolve(vsixPath) }),
       },
       stdio: "inherit",
