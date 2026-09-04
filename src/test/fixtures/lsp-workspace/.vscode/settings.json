@@ -1,0 +1,6 @@
+{
+  "dprint.experimentalLsp": true,
+  "editor.defaultFormatter": "dprint.dprint",
+  "editor.formatOnSave": true,
+  "files.eol": "\n"
+}

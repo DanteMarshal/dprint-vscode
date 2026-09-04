@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { Environment } from "../environment";
 import type { Logger } from "../logger";
+import { getDprintExecutableRelativePath, getDprintPackageName } from "./npmUtils";
 
 // todo: I'd write unit tests for these using the Environment, but setting up
 // unit tests seems like a huge pain... so I'm just manually testing this for now
@@ -11,7 +12,7 @@ export async function tryResolveNpmExecutable(
   logger: Logger,
 ) {
   try {
-    const packageName = await getDprintPackageName(env);
+    const packageName = await getPackageName(env);
     const nodeModulesExec = await tryResolveInNodeModules(dir, packageName, env, logger);
     if (nodeModulesExec == null) {
       return undefined;
@@ -46,7 +47,7 @@ async function tryResolveInNodeModules(
   logger: Logger,
 ) {
   const packagePath = vscode.Uri.joinPath(dir, "node_modules", "@dprint", packageName);
-  const npmExecutablePath = vscode.Uri.joinPath(packagePath, getDprintExeName(env));
+  const npmExecutablePath = vscode.Uri.joinPath(dir, getDprintExecutableRelativePath(packageName, env.platform()));
 
   const exists = await env.fileExists(npmExecutablePath);
   if (exists) {
@@ -71,15 +72,11 @@ async function tryResolveInNodeModules(
   return undefined;
 }
 
-function getDprintExeName(env: Environment) {
-  return env.platform() === "win32" ? "dprint.exe" : "dprint";
-}
-
-async function getDprintPackageName(env: Environment) {
+async function getPackageName(env: Environment) {
   const platform = env.platform();
   if (platform === "linux") {
-    return `${platform}-${env.arch()}-${await env.getLinuxFamily()}`;
+    return getDprintPackageName(platform, env.arch(), await env.getLinuxFamily());
   } else {
-    return `${platform}-${env.arch()}`;
+    return getDprintPackageName(platform, env.arch());
   }
 }

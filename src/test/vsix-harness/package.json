@@ -1,0 +1,10 @@
+{
+  "name": "dprint-vscode-test-harness",
+  "displayName": "Dprint VSIX Test Harness",
+  "publisher": "dprint",
+  "version": "0.0.0",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "main": "./extension.js"
+}

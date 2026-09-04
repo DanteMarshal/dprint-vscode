@@ -1,0 +1,13 @@
+{
+  "includes": [
+    "**/*.dprint-test"
+  ],
+  "plugins": [
+    "npm:@dprint/json"
+  ],
+  "json": {
+    "associations": [
+      "*.dprint-test"
+    ]
+  }
+}
