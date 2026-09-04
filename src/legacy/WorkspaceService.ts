@@ -1,6 +1,8 @@
+import * as path from "node:path";
 import * as vscode from "vscode";
 import type { ApprovedConfigPaths } from "../ApprovedConfigPaths";
 import { ancestorDirsContainConfigFile, discoverWorkspaceConfigFiles } from "../configFile";
+import { findConfigFileInAncestorDirectoriesPath, getFileSystemRootPath, isPathWithin } from "../configPaths";
 import type { EditorInfo } from "../executable/DprintExecutable";
 import { Logger } from "../logger";
 import { ObjectDisposedError } from "../utils";
@@ -23,8 +25,12 @@ export class WorkspaceService implements vscode.DocumentFormattingEditProvider {
   readonly #approvedPaths: ApprovedConfigPaths;
   readonly #logger: Logger;
   readonly #folders: FolderService[] = [];
+  readonly #looseFolders = new Map<string, FolderService>();
+  readonly #pendingLooseFolders = new Map<string, Promise<FolderService | undefined>>();
 
   #disposed = false;
+  #generation = 0;
+  #workspaceInitialization: Promise<FolderInfos> | undefined;
 
   constructor(opts: WorkspaceServiceOptions) {
     this.#approvedPaths = opts.approvedPaths;
@@ -42,20 +48,45 @@ export class WorkspaceService implements vscode.DocumentFormattingEditProvider {
     }
   }
 
-  provideDocumentFormattingEdits(
+  async provideDocumentFormattingEdits(
     document: vscode.TextDocument,
     options: vscode.FormattingOptions,
     token: vscode.CancellationToken,
   ) {
-    const folder = this.#getFolderForUri(document.uri);
-    return folder?.provideDocumentFormattingEdits(document, options, token);
+    if (document.uri.scheme !== "file") {
+      return undefined;
+    }
+
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+    let folder: FolderService | undefined;
+    if (workspaceFolder == null) {
+      folder = await this.#getLooseFolderForUri(document.uri);
+    } else {
+      folder = this.#getFolderForUri(document.uri);
+      const initialization = this.#workspaceInitialization;
+      if (folder == null && initialization != null) {
+        await initialization;
+        folder = this.#getFolderForUri(document.uri);
+      }
+    }
+    if (token.isCancellationRequested) {
+      return [];
+    }
+    if (folder == null) {
+      this.#logger.logErrorAndNotify(
+        "dprint could not find a usable configuration for this file.",
+        `Unable to initialize dprint for file: ${document.uri.fsPath}`,
+      );
+      return [];
+    }
+    return folder.provideDocumentFormattingEdits(document, options, token);
   }
 
   #getFolderForUri(uri: vscode.Uri) {
     let bestMatch: FolderService | undefined;
     for (const folder of this.#folders) {
-      if (uri.fsPath.startsWith(folder.uri.fsPath)) {
-        if (bestMatch == null || folder.uri.fsPath.startsWith(bestMatch.uri.fsPath)) {
+      if (isPathWithin(folder.uri.fsPath, uri.fsPath)) {
+        if (bestMatch == null || isPathWithin(bestMatch.uri.fsPath, folder.uri.fsPath)) {
           bestMatch = folder;
         }
       }
@@ -64,16 +95,95 @@ export class WorkspaceService implements vscode.DocumentFormattingEditProvider {
   }
 
   #clearFolders() {
+    this.#generation++;
+    this.#pendingLooseFolders.clear();
     for (const folder of this.#folders) {
       folder.dispose();
     }
     this.#folders.length = 0; // clear
+    for (const folder of this.#looseFolders.values()) {
+      folder.dispose();
+    }
+    this.#looseFolders.clear();
   }
 
-  async initializeFolders(): Promise<FolderInfos> {
+  async #getLooseFolderForUri(uri: vscode.Uri) {
+    this.#assertNotDisposed();
+    const configPath = findConfigFileInAncestorDirectoriesPath(path.dirname(uri.fsPath));
+    const rootUri = vscode.Uri.file(getFileSystemRootPath(uri.fsPath));
+    const configUri = configPath == null ? undefined : vscode.Uri.file(configPath);
+    const key = configUri == null ? `global:${rootUri.toString()}` : `config:${configUri.toString()}`;
+    const existing = this.#looseFolders.get(key);
+    if (existing != null) {
+      return existing;
+    }
+
+    const pending = this.#pendingLooseFolders.get(key);
+    if (pending != null) {
+      return pending;
+    }
+
+    const initialization = this.#initializeLooseFolder({
+      key,
+      rootUri,
+      configUri,
+      generation: this.#generation,
+    });
+    this.#pendingLooseFolders.set(key, initialization);
+    try {
+      return await initialization;
+    } finally {
+      if (this.#pendingLooseFolders.get(key) === initialization) {
+        this.#pendingLooseFolders.delete(key);
+      }
+    }
+  }
+
+  async #initializeLooseFolder(opts: {
+    key: string;
+    rootUri: vscode.Uri;
+    configUri: vscode.Uri | undefined;
+    generation: number;
+  }) {
+    const folder = new FolderService({
+      approvedPaths: this.#approvedPaths,
+      scopeUri: opts.configUri == null ? opts.rootUri : vscode.Uri.joinPath(opts.configUri, "../"),
+      cwd: opts.rootUri,
+      configUri: opts.configUri,
+      configDiscovery: opts.configUri == null ? "global" : undefined,
+      resolveNpmExecutable: false,
+      logger: this.#logger,
+    });
+    try {
+      const initialized = await folder.initialize();
+      this.#assertNotDisposed();
+      if (!initialized || opts.generation !== this.#generation) {
+        folder.dispose();
+        return undefined;
+      }
+      this.#looseFolders.set(opts.key, folder);
+      return folder;
+    } catch (err) {
+      folder.dispose();
+      throw err;
+    }
+  }
+
+  initializeFolders(): Promise<FolderInfos> {
+    const initialization = this.#initializeFolders();
+    this.#workspaceInitialization = initialization;
+    return initialization.finally(() => {
+      if (this.#workspaceInitialization === initialization) {
+        this.#workspaceInitialization = undefined;
+      }
+    });
+  }
+
+  async #initializeFolders(): Promise<FolderInfos> {
     this.#assertNotDisposed();
 
     this.#clearFolders();
+    const generation = this.#generation;
     if (vscode.workspace.workspaceFolders == null) {
       return [];
     }
@@ -81,16 +191,20 @@ export class WorkspaceService implements vscode.DocumentFormattingEditProvider {
     const configFiles = await discoverWorkspaceConfigFiles({
       logger: this.#logger,
     });
+    this.#assertNotDisposed();
+    if (generation !== this.#generation) {
+      return [];
+    }
 
     // Initialize the workspace folders with each sub configuration that's found.
     for (const folder of vscode.workspace.workspaceFolders) {
-      const stringFolderUri = folder.uri.toString();
-      const subConfigUris = configFiles.filter(c => c.toString().startsWith(stringFolderUri));
+      const subConfigUris = configFiles.filter(c => isPathWithin(folder.uri.fsPath, c.fsPath));
       for (const subConfigUri of subConfigUris) {
         this.#folders.push(
           new FolderService({
             approvedPaths: this.#approvedPaths,
-            workspaceFolder: folder,
+            scopeUri: folder.uri,
+            cwd: folder.uri,
             configUri: subConfigUri,
             logger: this.#logger,
           }),
@@ -108,7 +222,8 @@ export class WorkspaceService implements vscode.DocumentFormattingEditProvider {
         this.#folders.push(
           new FolderService({
             approvedPaths: this.#approvedPaths,
-            workspaceFolder: folder,
+            scopeUri: folder.uri,
+            cwd: folder.uri,
             configUri: undefined,
             logger: this.#logger,
           }),
@@ -126,6 +241,9 @@ export class WorkspaceService implements vscode.DocumentFormattingEditProvider {
     }));
 
     this.#assertNotDisposed();
+    if (generation !== this.#generation) {
+      return [];
+    }
 
     const allEditorInfos: FolderInfo[] = [];
     for (const folder of initializedFolders) {

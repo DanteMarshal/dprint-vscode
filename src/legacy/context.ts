@@ -4,19 +4,22 @@ import type { ExtensionBackend } from "../ExtensionBackend";
 import type { Logger } from "../logger";
 import { ActivatedDisposables, HttpsTextDownloader, ObjectDisposedError } from "../utils";
 import { ConfigJsonSchemaProvider } from "./ConfigJsonSchemaProvider";
-import { type FolderInfos, WorkspaceService } from "./WorkspaceService";
+import { WorkspaceService } from "./WorkspaceService";
 
 export function activateLegacy(
   logger: Logger,
   approvedPaths: ApprovedConfigPaths,
 ): ExtensionBackend {
   const resourceDisposables = new ActivatedDisposables(logger);
-  const initializationDisposables = new ActivatedDisposables(logger);
   const workspaceService = new WorkspaceService({
     approvedPaths,
     logger,
   });
   resourceDisposables.push(workspaceService);
+  resourceDisposables.push(vscode.languages.registerDocumentFormattingEditProvider(
+    { scheme: "file" },
+    workspaceService,
+  ));
 
   // todo: add an "onDidOpen" for dprint.json and use the appropriate EditorInfo
   // for ConfigJsonSchemaProvider based on the file that's shown
@@ -29,10 +32,8 @@ export function activateLegacy(
     isLsp: false,
     async reInitialize() {
       try {
-        initializationDisposables.dispose();
         const folderInfos = await workspaceService.initializeFolders();
         configSchemaProvider.setFolderInfos(folderInfos);
-        trySetFormattingSubscriptionFromFolderInfos(folderInfos);
         if (folderInfos.length === 0) {
           logger.logInfo("Configuration file not found.");
         }
@@ -44,43 +45,8 @@ export function activateLegacy(
       logger.logDebug("Initialized legacy backend.");
     },
     dispose() {
-      initializationDisposables.dispose();
       resourceDisposables.dispose();
       logger.logDebug("Disposed legacy backend.");
     },
   };
-
-  function trySetFormattingSubscriptionFromFolderInfos(allFolderInfos: FolderInfos) {
-    const formattingPatterns = getFormattingPatterns();
-
-    if (formattingPatterns.length === 0) {
-      return;
-    }
-
-    initializationDisposables.push(vscode.languages.registerDocumentFormattingEditProvider(
-      formattingPatterns.map(pattern => ({ scheme: "file", pattern })),
-      {
-        provideDocumentFormattingEdits(document, options, token) {
-          return workspaceService.provideDocumentFormattingEdits(document, options, token);
-        },
-      },
-    ));
-
-    function getFormattingPatterns() {
-      const patterns: vscode.RelativePattern[] = [];
-      for (const folderInfo of allFolderInfos) {
-        if (folderInfo.editorInfo.plugins.length > 0) {
-          // Match against all files and let the dprint CLI say if it can format a file or not.
-          // This is necessary because by using the "associations" feature, a user may pattern
-          // match against any file path then format that file using a certain plugin. Additionally,
-          // we can't use the "includes" and "excludes" patterns from the config file because we
-          // want to ensure consistent path matching behaviour... so don't want to rely on vscode's
-          // pattern matching being the same.
-          const pattern = new vscode.RelativePattern(folderInfo.uri, `**/*`);
-          patterns.push(pattern);
-        }
-      }
-      return patterns;
-    }
-  }
 }

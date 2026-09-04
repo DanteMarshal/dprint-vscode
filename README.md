@@ -29,9 +29,14 @@ Formats code in the editor using [dprint](https://dprint.dev/).
 
 Plugins are currently resolved based on the dprint configuration file in the current workspace folder.
 
+Files opened outside the active workspace, including files opened in an empty window, use the nearest ancestor
+configuration file and then fall back to the global dprint configuration.
+
 ## Requirements
 
 You must have dprint installed globally on the path.
+
+Loose-file formatting requires dprint 0.57 or newer for reliable outside-path and global configuration resolution.
 
 Follow the instructions here: [Install](https://dprint.dev/install/)
 
@@ -53,6 +58,8 @@ Follow the instructions here: [Install](https://dprint.dev/install/)
 ## Known Issues
 
 - No support for custom config locations.
+- In experimental LSP mode, global configuration fallback is limited to the filesystem volume where the language
+  server started. Loose files with their own ancestor configuration remain supported across volumes.
 
 ## Developing and Testing Locally
 

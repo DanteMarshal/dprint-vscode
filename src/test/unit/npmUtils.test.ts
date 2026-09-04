@@ -4,6 +4,7 @@ import {
   getDprintExecutableRelativePath,
   getDprintExeName,
   getDprintPackageName,
+  shouldResolveNpmExecutable,
 } from "../../executable/npmUtils";
 
 test("dprint npm package names include the Linux libc family", () => {
@@ -20,4 +21,10 @@ test("dprint npm executable paths are platform-specific", () => {
     getDprintExecutableRelativePath("linux-x64-glibc", "linux").split("\\").join("/"),
     "node_modules/@dprint/linux-x64-glibc/dprint",
   );
+});
+
+test("npm executable resolution is enabled by default and can be disabled for loose files", () => {
+  assert.equal(shouldResolveNpmExecutable(undefined), true);
+  assert.equal(shouldResolveNpmExecutable(true), true);
+  assert.equal(shouldResolveNpmExecutable(false), false);
 });

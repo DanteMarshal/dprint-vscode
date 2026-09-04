@@ -38,7 +38,7 @@
             "null"
           ],
           "default": false,
-          "markdownDescription": "Use dprint's experimental LSP (requires dprint 0.45+)",
+          "markdownDescription": "Use dprint's experimental LSP (requires dprint 0.45+). Reliable loose-file formatting requires dprint 0.57+; on Windows, global fallback is limited to the language server's launch volume.",
           "scope": "resource"
         },
         "dprint.path": {

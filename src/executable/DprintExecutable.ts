@@ -6,6 +6,7 @@ import type { DprintExtensionConfigPathInfo } from "../config";
 import type { Environment } from "../environment";
 import type { Logger } from "../logger";
 import { tryResolveNpmExecutable } from "./npm";
+import { shouldResolveNpmExecutable } from "./npmUtils";
 
 export interface EditorInfo {
   schemaVersion: number;
@@ -28,7 +29,10 @@ export interface DprintExecutableOptions {
   approvedPaths: ApprovedConfigPaths;
   pathInfo: DprintExtensionConfigPathInfo | undefined;
   cwd: vscode.Uri;
+  executableSearchUri?: vscode.Uri;
   configUri: vscode.Uri | undefined;
+  configDiscovery?: "global";
+  resolveNpmExecutable?: boolean;
   verbose: boolean;
   logger: Logger;
   environment: Environment;
@@ -38,6 +42,7 @@ export class DprintExecutable {
   readonly #cmdPath: string;
   readonly #cwd: vscode.Uri;
   readonly #configUri: vscode.Uri | undefined;
+  readonly #configDiscovery: "global" | undefined;
   readonly #verbose: boolean;
   readonly #logger: Logger;
 
@@ -46,6 +51,7 @@ export class DprintExecutable {
     this.#cmdPath = cmdPath;
     this.#cwd = options.cwd;
     this.#configUri = options.configUri;
+    this.#configDiscovery = options.configDiscovery;
     this.#verbose = options.verbose;
   }
 
@@ -56,19 +62,20 @@ export class DprintExecutable {
 
   static async resolveCmdPath(options: DprintExecutableOptions) {
     const { approvedPaths, pathInfo, cwd, logger, environment } = options;
+    const executableSearchUri = options.executableSearchUri ?? cwd;
 
     // if a custom path is configured, check approval
     if (pathInfo != null) {
       const approved = await approvedPaths.promptForApproval(pathInfo);
       if (approved) {
-        return getCommandNameOrAbsolutePath(pathInfo.path, cwd);
+        return getCommandNameOrAbsolutePath(pathInfo.path, executableSearchUri);
       }
       // not approved - fall through to regular resolution
     }
 
     // attempt to use the npm executable if it exists
-    if (cwd != null) {
-      const npmExec = await tryResolveNpmExecutable(cwd, environment, logger);
+    if (shouldResolveNpmExecutable(options.resolveNpmExecutable) && executableSearchUri != null) {
+      const npmExec = await tryResolveNpmExecutable(executableSearchUri, environment, logger);
       if (npmExec != null) {
         return npmExec;
       }
@@ -174,11 +181,14 @@ export class DprintExecutable {
   }
 
   #getConfigArgs() {
+    const args: string[] = [];
     if (this.#configUri) {
-      return ["--config", this.#configUri.fsPath];
-    } else {
-      return [];
+      args.push("--config", this.#configUri.fsPath);
     }
+    if (this.#configDiscovery != null) {
+      args.push(`--config-discovery=${this.#configDiscovery}`);
+    }
+    return args;
   }
 }
 

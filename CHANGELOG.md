@@ -1,5 +1,9 @@
 # Change Log
 
+### Unreleased
+
+- feat: format files outside active workspaces using ancestor or global configurations (#136)
+
 ### 0.17.2
 
 - fix: dispose formatting edit provider on config reinitialization (#141)
