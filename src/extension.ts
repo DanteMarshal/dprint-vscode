@@ -31,6 +31,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const globalState = await getAndSetNewGlobalState(context);
   const backend = globalState.extensionBackend;
   const logger = globalState.logger;
+  let backendInitialization = Promise.resolve(true);
 
   // reinitialize on workspace folder changes
   context.subscriptions.push(vscode.commands.registerCommand("dprint.restart", reInitializeBackend));
@@ -86,13 +87,16 @@ export async function activate(context: vscode.ExtensionContext) {
   });
 
   async function reInitializeBackend() {
-    try {
-      await backend.reInitialize();
-      return true;
-    } catch (err) {
-      logger.logError("Error initializing:", err);
-      return false;
-    }
+    backendInitialization = backendInitialization.then(async () => {
+      try {
+        await backend.reInitialize();
+        return true;
+      } catch (err) {
+        logger.logError("Error initializing:", err);
+        return false;
+      }
+    });
+    return backendInitialization;
   }
 }
 
