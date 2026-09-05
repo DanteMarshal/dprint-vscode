@@ -57,7 +57,9 @@ async function runScenario(backend, hasWorkspace) {
   const globalFiles = path.join(scenarioRoot, "global-files");
   const missingFiles = path.join(scenarioRoot, "missing-files");
   const globalConfigDir = path.join(scenarioRoot, "global-config");
-  const userDataDir = path.join(scenarioRoot, "user-data");
+  // Keep profiles close to the temporary root: VS Code's IPC socket path must
+  // fit macOS's 103-character limit. Each scenario still needs its own profile.
+  const userDataDir = path.join(testRoot, `u${backend === "legacy" ? "0" : "1"}${hasWorkspace ? "w" : "e"}`);
   const extensionsDir = path.join(scenarioRoot, "extensions");
 
   for (

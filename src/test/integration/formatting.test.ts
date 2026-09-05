@@ -124,6 +124,7 @@ async function showAndFormat(document: vscode.TextDocument) {
   const edits = await vscode.commands.executeCommand<vscode.TextEdit[]>(
     "vscode.executeFormatDocumentProvider",
     document.uri,
+    { tabSize: 2, insertSpaces: true },
   );
   if (edits != null && edits.length > 0) {
     const workspaceEdit = new vscode.WorkspaceEdit();
