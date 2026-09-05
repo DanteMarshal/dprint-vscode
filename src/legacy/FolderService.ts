@@ -9,8 +9,11 @@ import { createEditorService, type EditorService } from "./editor-service";
 
 export interface FolderServiceOptions {
   approvedPaths: ApprovedConfigPaths;
-  workspaceFolder: vscode.WorkspaceFolder;
+  scopeUri: vscode.Uri;
+  cwd: vscode.Uri;
   configUri: vscode.Uri | undefined;
+  configDiscovery?: "global";
+  resolveNpmExecutable?: boolean;
   logger: Logger;
 }
 
@@ -19,8 +22,11 @@ export class FolderService implements vscode.DocumentFormattingEditProvider {
   readonly #approvedPaths: ApprovedConfigPaths;
   readonly #logger: Logger;
   readonly #environment: Environment;
-  readonly #workspaceFolder: vscode.WorkspaceFolder;
+  readonly #scopeUri: vscode.Uri;
+  readonly #cwd: vscode.Uri;
   readonly #configUri: vscode.Uri | undefined;
+  readonly #configDiscovery: "global" | undefined;
+  readonly #resolveNpmExecutable: boolean;
   #disposed = false;
 
   #editorService: EditorService | undefined;
@@ -29,8 +35,11 @@ export class FolderService implements vscode.DocumentFormattingEditProvider {
   constructor(opts: FolderServiceOptions) {
     this.#approvedPaths = opts.approvedPaths;
     this.#logger = opts.logger;
-    this.#workspaceFolder = opts.workspaceFolder;
+    this.#scopeUri = opts.scopeUri;
+    this.#cwd = opts.cwd;
     this.#configUri = opts.configUri;
+    this.#configDiscovery = opts.configDiscovery;
+    this.#resolveNpmExecutable = opts.resolveNpmExecutable ?? true;
     this.#environment = new RealEnvironment(this.#logger);
   }
 
@@ -38,7 +47,7 @@ export class FolderService implements vscode.DocumentFormattingEditProvider {
     if (this.#configUri != null) {
       return vscode.Uri.joinPath(this.#configUri, "../");
     }
-    return this.#workspaceFolder.uri;
+    return this.#scopeUri;
   }
 
   dispose() {
@@ -156,13 +165,15 @@ export class FolderService implements vscode.DocumentFormattingEditProvider {
     return DprintExecutable.create({
       approvedPaths: this.#approvedPaths,
       pathInfo: config.pathInfo,
-      // It's important that we always use the workspace folder as the
+      // It's important that workspace services use the workspace folder as the
       // cwd for the process instead of possibly the sub directory because
       // we don't want the dprint process to hold a resource lock on a
       // sub directory. That would give the user a bad experience where
       // they can't delete the sub directory.
-      cwd: this.#workspaceFolder.uri,
+      cwd: this.#cwd,
       configUri: this.#configUri,
+      configDiscovery: this.#configDiscovery,
+      resolveNpmExecutable: this.#resolveNpmExecutable,
       verbose: config.verbose,
       logger: this.#logger,
       environment: this.#environment,

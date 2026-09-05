@@ -12,3 +12,7 @@ export function getDprintExeName(platform: NodeJS.Platform) {
 export function getDprintExecutableRelativePath(packageName: string, platform: NodeJS.Platform) {
   return path.join("node_modules", "@dprint", packageName, getDprintExeName(platform));
 }
+
+export function shouldResolveNpmExecutable(resolveNpmExecutable: boolean | undefined) {
+  return resolveNpmExecutable ?? true;
+}

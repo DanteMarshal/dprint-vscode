@@ -13,6 +13,10 @@ export interface DprintExtensionConfig {
 }
 
 export function getCombinedDprintConfig(folders: readonly vscode.WorkspaceFolder[]) {
+  if (folders.length === 0) {
+    return getDprintConfig();
+  }
+
   const combinedConfig: DprintExtensionConfig = {
     pathInfo: undefined,
     verbose: false,
@@ -35,7 +39,7 @@ export function getCombinedDprintConfig(folders: readonly vscode.WorkspaceFolder
   return combinedConfig;
 }
 
-export function getDprintConfig(scope: vscode.Uri): DprintExtensionConfig {
+export function getDprintConfig(scope?: vscode.Uri): DprintExtensionConfig {
   const config = vscode.workspace.getConfiguration("dprint", scope);
   const pathInfo = getPathInfo();
   return {

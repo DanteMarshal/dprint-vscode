@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { NotificationThrottle } from "./NotificationThrottle";
 
 export class Instant {
   #time: number;
@@ -20,7 +21,7 @@ export class Logger {
   readonly #outputChannel: vscode.OutputChannel;
   #debug = false;
 
-  static #hasFocused = false;
+  static readonly #notificationThrottle = new NotificationThrottle();
 
   constructor(outputChannel: vscode.OutputChannel) {
     this.#outputChannel = outputChannel;
@@ -59,8 +60,7 @@ export class Logger {
   logErrorAndNotify(notificationMessage: string, message: string, ...args: any[]) {
     this.logError(message, ...args);
     // only notify max one time per session to not annoy people
-    if (!Logger.#hasFocused) {
-      Logger.#hasFocused = true;
+    if (Logger.#notificationThrottle.shouldNotify()) {
       const buttonText = "Go to output";
       vscode.window.showWarningMessage(notificationMessage, buttonText).then(selection => {
         if (selection === buttonText) {
