@@ -82,6 +82,7 @@ async function runScenario(backend, hasWorkspace) {
     path.join(userDataDir, "User", "settings.json"),
     JSON.stringify({
       "dprint.experimentalLsp": backend === "lsp",
+      "dprint.verbose": true,
       "editor.defaultFormatter": "dprint.dprint",
       "editor.formatOnSave": true,
       "files.eol": "\n",
@@ -149,8 +150,24 @@ async function runScenario(backend, hasWorkspace) {
     throw result.error;
   }
   if (result.status !== 0) {
+    printFailureLogs(path.join(userDataDir, "logs"));
     process.exitCode = result.status ?? 1;
     throw new Error(`VS Code integration scenario ${name} failed.`);
+  }
+}
+
+function printFailureLogs(directory) {
+  try {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const filePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        printFailureLogs(filePath);
+      } else if (entry.isFile() && /(?:dprint|exthost).*\.log$/i.test(entry.name)) {
+        console.error(`VS Code failure log: ${filePath}\n${fs.readFileSync(filePath, "utf8")}`);
+      }
+    }
+  } catch (error) {
+    console.error(`Could not read VS Code failure logs in ${directory}:`, error);
   }
 }
 
