@@ -6,6 +6,14 @@ const { pathToFileURL } = require("node:url");
 const { runVSCodeCommand } = require("@vscode/test-electron");
 
 const root = path.resolve(__dirname, "..");
+const dprintBinDir = path.dirname(require.resolve("dprint/package.json"));
+// Loose files resolve dprint from PATH. Expose the pinned native executable
+// directly, rather than relying on npm's Windows command wrappers.
+const pathKey = Object.keys(process.env).find(key => key.toLowerCase() === "path") ?? "PATH";
+const testEnv = {
+  ...process.env,
+  [pathKey]: `${dprintBinDir}${path.delimiter}${process.env[pathKey] ?? ""}`,
+};
 const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dprint-vscode-test-"));
 const pluginUrl = pathToFileURL(path.join(root, "node_modules", "@dprint", "json", "plugin.wasm")).href;
 const vsixIndex = process.argv.indexOf("--vsix");
@@ -39,6 +47,16 @@ main().catch(error => {
 
 async function main() {
   try {
+    const result = childProcess.spawnSync("dprint", ["-v"], {
+      cwd: path.parse(testRoot).root,
+      env: testEnv,
+      shell: true,
+      encoding: "utf8",
+    });
+    if (result.error != null || result.status !== 0) {
+      throw new Error(`Failed launching test dprint from PATH: ${result.error ?? result.stderr}`);
+    }
+    console.log(`Test formatter: ${result.stdout.trim()} (${dprintBinDir})`);
     for (const backend of ["legacy", "lsp"]) {
       for (const hasWorkspace of [true, false]) {
         await runScenario(backend, hasWorkspace);
@@ -128,7 +146,7 @@ async function runScenario(backend, hasWorkspace) {
     {
       cwd: root,
       env: {
-        ...process.env,
+        ...testEnv,
         DPRINT_CONFIG_DIR: globalConfigDir,
         DPRINT_TEST_ANCESTOR_PROJECT: ancestorProject,
         DPRINT_TEST_BACKEND: backend,
