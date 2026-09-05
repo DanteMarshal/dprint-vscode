@@ -14,7 +14,10 @@ const testEnv = {
   ...process.env,
   [pathKey]: `${dprintBinDir}${path.delimiter}${process.env[pathKey] ?? ""}`,
 };
-const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dprint-vscode-test-"));
+// LSP global fallback is scoped to its launch volume on Windows, so keep test
+// files on the checkout volume. Other platforms use their normal temp folder.
+const testTempDir = process.platform === "win32" ? path.dirname(root) : os.tmpdir();
+const testRoot = fs.mkdtempSync(path.join(testTempDir, "dprint-vscode-test-"));
 const pluginUrl = pathToFileURL(path.join(root, "node_modules", "@dprint", "json", "plugin.wasm")).href;
 const vsixIndex = process.argv.indexOf("--vsix");
 const isVsixRun = vsixIndex !== -1;

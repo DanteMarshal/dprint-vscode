@@ -15,6 +15,7 @@ export function activateLsp(
   approvedPaths: ApprovedConfigPaths,
 ): ExtensionBackend {
   let client: LanguageClient | undefined;
+  let clientGeneration = 0;
   let launchRootUri: vscode.Uri | undefined;
   const availableGlobalConfigs = new Set<string>();
   const pendingGlobalConfigProbes = new Map<string, Promise<boolean>>();
@@ -22,6 +23,7 @@ export function activateLsp(
   return {
     isLsp: true,
     async reInitialize() {
+      const generation = ++clientGeneration;
       const oldClient = client;
       client = undefined;
       await oldClient?.dispose(2_000);
@@ -62,6 +64,12 @@ export function activateLsp(
         outputChannel: logger.getOutputChannel(),
         middleware: {
           async provideDocumentFormattingEdits(document, options, token, next) {
+            // Formatting providers may still receive requests while their
+            // language client is being disposed. Do not ask an obsolete client
+            // to restart itself while its replacement is initializing.
+            if (generation !== clientGeneration) {
+              return [];
+            }
             if (document.uri.scheme !== "file" || vscode.workspace.getWorkspaceFolder(document.uri) != null) {
               return next(document, options, token);
             }
@@ -106,6 +114,7 @@ export function activateLsp(
       logger.logInfo("Started experimental language server.");
     },
     async dispose() {
+      clientGeneration++;
       const oldClient = client;
       client = undefined;
       await oldClient?.dispose(2_000);
