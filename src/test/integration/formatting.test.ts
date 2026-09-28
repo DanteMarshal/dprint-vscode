@@ -56,6 +56,25 @@ suite(`${backend} formatting (${hasWorkspace ? "workspace" : "empty window"})`, 
     await waitForFormattedDocument(document, formattedJson(6), () => showAndFormat(document));
   });
 
+  if (backend === "legacy") {
+    test("offers formatting for a loose file without a default formatter", async () => {
+      const target = hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+      await vscode.workspace.getConfiguration("editor").update("defaultFormatter", null, target);
+      try {
+        await vscode.commands.executeCommand("dprint.restart");
+        const document = await createDocument(
+          vscode.Uri.joinPath(globalFilesUri, "manual-format.dprint-test"),
+          unformattedJson,
+        );
+        assert.notEqual(vscode.workspace.getConfiguration("editor", document.uri).get("defaultFormatter"), extensionId);
+        await waitForFormattedDocument(document, formattedJson(6), () => showAndFormat(document));
+      } finally {
+        await vscode.workspace.getConfiguration("editor").update("defaultFormatter", undefined, target);
+        await vscode.commands.executeCommand("dprint.restart");
+      }
+    });
+  }
+
   test("does not use the global config when disabled", async () => {
     const target = hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
     await vscode.workspace.getConfiguration("dprint").update("useGlobalConfig", false, target);

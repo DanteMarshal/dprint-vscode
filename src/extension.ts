@@ -48,7 +48,11 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(fileSystemWatcher);
   context.subscriptions.push(fileSystemWatcher.onDidChange(async () => {
     try {
-      await backend.onConfigFileChanged();
+      if (backend.isLsp) {
+        await queueBackendAction(() => backend.onConfigFileChanged());
+      } else {
+        await backend.onConfigFileChanged();
+      }
     } catch (err) {
       logger.logError("Error handling configuration file change:", err);
     }
@@ -99,9 +103,13 @@ export async function activate(context: vscode.ExtensionContext) {
   });
 
   async function reInitializeBackend() {
+    return queueBackendAction(() => backend.reInitialize());
+  }
+
+  function queueBackendAction(action: () => Promise<void>) {
     backendInitialization = backendInitialization.then(async () => {
       try {
-        await backend.reInitialize();
+        await action();
         return true;
       } catch (err) {
         logger.logError("Error initializing:", err);

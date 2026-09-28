@@ -13,7 +13,7 @@ export interface DprintExtensionConfig {
   useGlobalConfig: boolean;
 }
 
-export function getCombinedDprintConfig(folders: readonly vscode.WorkspaceFolder[]) {
+export function getCombinedDprintConfig(folders: readonly vscode.WorkspaceFolder[]): DprintExtensionConfig {
   if (folders.length === 0) {
     return getDprintConfig();
   }
